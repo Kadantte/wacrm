@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   Eye,
@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { SettingsPanelHead } from './settings-panel-head';
 import {
   Accordion,
   AccordionItem,
@@ -52,6 +53,13 @@ export function WhatsAppConfig() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('unknown');
   const [resetReason, setResetReason] = useState<ResetReason>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
+  // Guards against re-hydrating the form when the load effect below
+  // re-runs for reasons unrelated to actually switching accounts —
+  // e.g. Supabase's onAuthStateChange fires a token refresh (new
+  // `user` object, profileLoading flips true/false) when the browser
+  // tab regains focus. Without this, that churn calls fetchConfig()
+  // again and overwrites whatever the user typed but hadn't saved yet.
+  const loadedAccountIdRef = useRef<string | null>(null);
 
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
@@ -163,11 +171,14 @@ export function WhatsAppConfig() {
     // once the profile arrives.
     if (authLoading || profileLoading) return;
     if (!user || !accountId) {
+      loadedAccountIdRef.current = null;
       setLoading(false);
       return;
     }
+    if (loadedAccountIdRef.current === accountId) return;
+    loadedAccountIdRef.current = accountId;
     fetchConfig(accountId);
-  }, [authLoading, profileLoading, user, accountId, fetchConfig]);
+  }, [authLoading, profileLoading, user?.id, accountId, fetchConfig]);
 
   async function handleSave() {
     if (!phoneNumberId.trim()) {
@@ -360,16 +371,27 @@ export function WhatsAppConfig() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-6 animate-spin text-primary" />
-      </div>
+      <section className="animate-in fade-in-50 duration-200">
+        <SettingsPanelHead
+          title="WhatsApp connection"
+          description="Connect your Meta WhatsApp Business API. Credentials, webhook, and setup steps all live here."
+        />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-primary" />
+        </div>
+      </section>
     );
   }
 
   const showResetBanner = resetReason === 'token_corrupted';
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px] mt-4">
+    <section className="animate-in fade-in-50 duration-200">
+      <SettingsPanelHead
+        title="WhatsApp connection"
+        description="Connect your Meta WhatsApp Business API. Credentials, webhook, and setup steps all live here."
+      />
+      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       {/* Main config form */}
       <div className="space-y-6">
         {/* Corrupted-token reset banner */}
@@ -536,7 +558,7 @@ export function WhatsAppConfig() {
         )}
 
         {/* API Credentials */}
-        <Card className="bg-card border-border ring-0 ring-transparent">
+        <Card>
           <CardHeader>
             <CardTitle className="text-foreground">API Credentials</CardTitle>
             <CardDescription className="text-muted-foreground">
@@ -648,7 +670,7 @@ export function WhatsAppConfig() {
         </Card>
 
         {/* Webhook URL */}
-        <Card className="bg-card border-border ring-0 ring-transparent">
+        <Card>
           <CardHeader>
             <CardTitle className="text-foreground">Webhook Configuration</CardTitle>
             <CardDescription className="text-muted-foreground">
@@ -736,7 +758,7 @@ export function WhatsAppConfig() {
 
       {/* Setup Instructions Sidebar */}
       <div>
-        <Card className="bg-card border-border ring-0 ring-transparent">
+        <Card>
           <CardHeader>
             <CardTitle className="text-foreground text-base">Setup Instructions</CardTitle>
             <CardDescription className="text-muted-foreground">
@@ -829,5 +851,6 @@ export function WhatsAppConfig() {
         </Card>
       </div>
     </div>
+    </section>
   );
 }
